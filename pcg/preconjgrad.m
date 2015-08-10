@@ -10,7 +10,7 @@ resvec = zeros(maxits+1,1);
 r = b - Amult(A,x);
 z = presolve(P,r);
 resvec(1) = norm(r);
-p = z
+p = z;
 ztr = z'*r;
 
 ANormEstimate = 0;
@@ -24,7 +24,7 @@ for iter = 1:maxits
     r_old = r;
     r = r_old - alpha*w;
     resvec(iter+1) = norm(r);
-    ANormEstimate = ANormEstimate + alpha*ztr
+    ANormEstimate = ANormEstimate + alpha*ztr;
     if resvec(iter+1) < tol*resvec(1);
         if verbose, fprintf('converged!\n'); end
         return
