@@ -40,7 +40,7 @@ end
 %%%%
 function y = Amult(A,x)
 if isa(A,'function_handle')
-    y = P(x);
+    y = A(x);
 else
     y = A*x;
 end
