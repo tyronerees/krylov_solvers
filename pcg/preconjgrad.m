@@ -1,9 +1,10 @@
-function [x,iter,resvec] = preconjgrad(A,b,maxits,x,tol,P,verbose);
+function [x,iter,resvec,flag] = preconjgrad(A,b,maxits,x,tol,P,verbose);
 
 if nargin == 6
     verbose = 0;
 end
 % A plain preconditioned conjugate gradients routine
+flag = 0;
 n = length(b);
 resvec = zeros(maxits+1,1);
 
@@ -35,6 +36,8 @@ for iter = 1:maxits
     beta = (ztr)/(z_old'*r_old);
     p = z + beta*p;
 end
+
+flag = 1;
 
 
 %%%%
