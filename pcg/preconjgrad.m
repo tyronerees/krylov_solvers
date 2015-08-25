@@ -4,6 +4,7 @@ if nargin == 6
     verbose = 0;
 end
 % A plain preconditioned conjugate gradients routine
+flag = 0;
 n = length(b);
 resvec = zeros(maxits+1,1);
 flag = 0;
