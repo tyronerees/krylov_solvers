@@ -1,4 +1,4 @@
-function [x,iter,resvec] = preconjgrad(A,b,maxits,x,tol,P,verbose);
+function [x,iter,resvec,flag] = preconjgrad(A,b,maxits,x,tol,P,verbose);
 
 if nargin == 6
     verbose = 0;
@@ -6,6 +6,7 @@ end
 % A plain preconditioned conjugate gradients routine
 n = length(b);
 resvec = zeros(maxits+1,1);
+flag = 0;
 
 r = b - Amult(A,x);
 z = presolve(P,r);
@@ -36,6 +37,7 @@ for iter = 1:maxits
     p = z + beta*p;
 end
 
+flag = 1;
 
 %%%%
 function y = Amult(A,x)
