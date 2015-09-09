@@ -1,4 +1,4 @@
-function [u,iter,resvec] = minres_t(A,b,M,u,tol,maxits,Test2Norm)
+function [u,iter,resvec,flag] = minres_t(A,b,M,u,tol,maxits,Test2Norm)
 %MINRES_T My version of MINRES
 %
 % This is my version of MINRES -- adapted from the pdeminres file
@@ -24,6 +24,8 @@ function [u,iter,resvec] = minres_t(A,b,M,u,tol,maxits,Test2Norm)
 if nargin == 6
     Test2Norm = 0;
 end
+
+flag = 0;
 
 resvec = zeros(maxits,1);
 lb = length(b);
@@ -100,7 +102,9 @@ end
 
 resvec = resvec(1:iter+1);
 if iter == maxits
-    fprintf('Maximum number of iterations reached, MINRES failed to converge\n')
+    fprintf(['Maximum number of iterations reached, MINRES failed ' ...
+             'to converge\n'])
+    flag = 1;
 end
 %%%%%%%%%%%%%%%
 function x = presolve(P,b)
