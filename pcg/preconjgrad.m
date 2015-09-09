@@ -7,6 +7,7 @@ end
 flag = 0;
 n = length(b);
 resvec = zeros(maxits+1,1);
+flag = 0;
 
 r = b - Amult(A,x);
 z = presolve(P,r);
@@ -38,7 +39,6 @@ for iter = 1:maxits
 end
 
 flag = 1;
-
 
 %%%%
 function y = Amult(A,x)
