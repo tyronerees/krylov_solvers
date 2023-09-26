@@ -263,21 +263,21 @@ for p = 1:nmaxits                 % loop over the columns of Zk
     for l = 1:pp-1  % update previous rots
         h1 = H(l,pp);
         h2 = H(l+1,pp);
-        H(l,pp) = c(l)*h1 + s(l)*h2;
+        H(l,pp) = conj(c(l))*h1 + conj(s(l))*h2;
         H(l+1,pp) = -s(l)*h1 + c(l)*h2;
     end
     h1 = H(pp,pp);
     h2 = H(pp+1,pp);
-    gam = sqrt(h1^2 + h2^2);
+    gam = sqrt(abs(h1)^2 + h2^2);
     c(pp) = h1/gam;
     s(pp) = h2/gam;
-    H(pp,pp) = c(pp)*h1+s(pp)*h2;
+    H(pp,pp) = conj(c(pp))*h1+conj(s(pp))*h2;
     H(pp+1,pp) = 0;
     
     % update rhs
     rhs_old = rhs;              % save old rhs
     rhs(pp+1) = -s(pp)*rhs(pp);
-    rhs(pp) = c(pp)*rhs(pp);
+    rhs(pp) = conj(c(pp))*rhs(pp);
     
     %    test_lindep_block;
     if (lindep_flag==1)&&((abs(rhs(pp+1)) >= max(tol*nr,SMALL))|| ...
