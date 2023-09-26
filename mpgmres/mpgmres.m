@@ -46,7 +46,7 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %   iterations needed for convergence.
 % 
 %   [X,RELRES,ITER,RESVEC] = MPGMRES(A,B,...) also returns a vector of the
-%   residual norms at each iteration.
+%   relative residual norms at each iteration.
 %
 %   [X,RELRES,ITER,RESVEC,MVECS] = MPGMRES(A,B,...) also returns a vector
 %   of the cumulative number of inner products taken at the end of
@@ -281,7 +281,7 @@ for p = 1:nmaxits                 % loop over the columns of Zk
     
     %    test_lindep_block;
     if (lindep_flag==1)&&((abs(rhs(pp+1)) >= max(tol*nr,SMALL))|| ...
-                          (isnan(abs(rhs(pp+1)))))&&(nVk>1); % the last column of Z is dependent on the others
+                          (isnan(abs(rhs(pp+1)))))&&(nVk>1) % the last column of Z is dependent on the others
         fprintf('Column of Z linearly dependent...removing \n')
         pp = pp-1;          % reduce index by 1
         lindep_flag = 0;    % reset linear dependence flag
@@ -306,8 +306,7 @@ for p = 1:nmaxits                 % loop over the columns of Zk
         end
         if lindep_flag==1  % we have a lucky breakdown
             z_it(1) = z_it(1)+1;
-            resvec(z_it(1)) = abs(rhs(pp+1))/nr;    % save residual
-                                                    % to resvec
+            resvec(z_it(1)) = abs(rhs(pp+1))/nr;    % save residual to resvec
             fprintf('MPGMRES converged -- lucky breakdown! \n')
             break
         end
@@ -321,8 +320,7 @@ for p = 1:nmaxits                 % loop over the columns of Zk
     z_it(2) = z_it(2)+1;         % update the index column of Z we're working on
     
     if z_it(2) == Zk
-        resvec(z_it(1)+1) = abs(rhs(pp+1))/nr;    % save residual
-                                                  % to resvec
+        resvec(z_it(1)+1) = abs(rhs(pp+1))/nr;    % save residual to resvec
         
         
         %% test convergence
@@ -476,7 +474,7 @@ end
 resvec = resvec(1:z_it(1));
 mvecs = mvecs(1:z_it(1));
 iter = length(resvec) - 1;
-relres = resvec(end)/norm(b);
+relres = resvec(end);
 
 
 %% apply multiple preconditioners to the residual r
@@ -496,7 +494,7 @@ else
             z(:,i)=pre{i}\Q(:,i);
         end
     end
-    for i = m+1 : length(pre);
+    for i = m+1 : length(pre)
         if isa(pre{i},'function_handle')
             z(:,i)=pre{i}(Q(:,mod(i,m)+1));
         else
