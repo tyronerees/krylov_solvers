@@ -1,6 +1,10 @@
 function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,varargin)
 %MPGMRES An extension of GMRES which accepts multiple preconditioners.
 %
+%IMPORTANT NOTE: If a flexible Krylov method is required due to the
+%preconditioners potentially changing each iteration then STOREZ must be
+%set to 1 (which is not the default).
+%
 %   X = MPGMRES(A,B,P) solves the linear system A*X = B for X.  The matrix
 %   A should be of dimension n by n, and generally large and sparse.  The
 %   vector B must have length n.  P should be a cell array of
@@ -16,8 +20,11 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %   TYPE can also be a structure, which gives more control over the type of
 %   truncation.  For details, see <a href="matlab: help mpgmres_120112>extended_help">here</a>.  
 %
-%   X = MPGMRES(A,B,P,TYPE,TOL) specifies the tolerance of the method.  The
-%   default value is 1e-6.
+%   X = MPGMRES(A,B,P,TYPE,TOL) specifies the tolerance of the method.  TOL
+%   may either be a scalar defining the relative tolerance or a vector of
+%   length two defining the relative and absolute tolerances, respectively.
+%   The default relative tolerance is 1e-6 while the default absolute
+%   tolerance is 0.
 %
 %   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS) specifies the maxiumum number of
 %   iterations the methods allows.  The default value is n.
@@ -26,8 +33,11 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %   must be a vector of dimension n.  The default value is the zero vector.
 %
 %   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS,X0,STOREZ) specifies whether to store
-%   or calculate the matrix of search directions.  STOREZ = 1 stores, 
-%   STOREZ = 0 calculates.  The default is 0. 
+%   or calculate the matrix of search directions. The storage option
+%   requires roughly double the storage but must be used if a flexible
+%   method is required. On the other hand, without storage a final
+%   multiprecondition step is required to calculate X.  STOREZ = 1 stores,
+%   STOREZ = 0 calculates.  The default is 0.
 %
 %   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS,X0,STOREZ,TESTORTH) specifies whether
 %   or not to check for loss of orthogonality (should only be used for
@@ -35,10 +45,10 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %   TESTORTH = 1 runs the check, TESTORTH = 0 does not.  The default is 0.
 %
 %   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS,X0,STOREZ,TESTORTH,SAVEMATS)
-%   specifies whether or not to save the matrices generated in the Arnoldi process at each iteration.  This
-%   should only be used for diagonostic purposes, as it is a relatively 
-%   expensive process.  SAVEMATS = 0 doesn't save matrices, SAVEMATS = 1
-%   does.  The default is 0.
+%   specifies whether or not to save the matrices generated in the Arnoldi
+%   process at each iteration.  This should only be used for diagonostic
+%   purposes, as it is a relatively expensive process.  SAVEMATS = 0
+%   doesn't save matrices, SAVEMATS = 1 does.  The default is 0.
 %
 %   [X,RELRES] = MPGMRES(A,B,...) also returns the relative residual.
 %
@@ -58,6 +68,8 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %   Technical report: UBC CS TR-2011-12, or Temple Math. report 11-12-23
 %   
 %   12 Jan 2012: First release version of MPGMRES
+%   28 Sep 2023: Modified to work in complex arithmetic
+%                Finer tolerance control and bug fixes
 %
 %   Tyrone Rees                        tyronere@cs.ubc.ca
 %   Department of Computer Science 
@@ -70,7 +82,7 @@ if (lb==1)||(wb==1) % test if  b is a vector
         b = b'; lb = wb;
     end
 else
-    error('right hand side b must be a vector')
+    error('Right hand side b must be a vector')
 end
 
 if isa(A,'float')
@@ -85,7 +97,7 @@ if isa(A,'float')
 elseif isa(A,'function_handle')
     Atype = 'func';
 else
-    error('unsupported type of A supplied')
+    error('Unsupported type of A supplied')
 end
 
 if nargin < 3
@@ -97,17 +109,27 @@ if nargin < 4
 end
 
 if nargin < 5
-    tol = 1e-6;
+    tol = [1e-6 0];
 else
     if isa(tol,'numeric') ~= 1
         error('The tolerance must be a numeric value')
     end
+    [ltol,wtol] = size(tol);
+    if ltol+wtol == 2
+        tol = [tol 0];
+    elseif ltol+wtol > 3
+        error('The tolerance must be a vector with at most two entries')
+    end
+    if max(tol) <= 0
+        error('At least one tolerance value should be positive')
+    end
 end
+
 if nargin < 6
     maxits = lb;
 else
-    if isa(maxits,'numeric') ~= 1
-        error('The max number of iterations must be an integer')
+    if (isa(maxits,'numeric') ~= 1 || maxits < 1)
+        error('The max number of iterations must be a positive integer')
     end
 end
 if nargin < 7
@@ -123,7 +145,7 @@ else
 end
 numvarargs = length(varargin);
 if numvarargs > 4
-    error('too many inputs')
+    error('Too many inputs')
 end
 optargs = {0 0 0}; % optional values of 'storeZ','testorth', 'savemats'
 optargs(1:numvarargs) = varargin;
@@ -167,15 +189,15 @@ elseif isa(type_in,'struct') % if a structure, then allow more control
                 case 1
                     valid = {'inorder','reverse','alternate','random'};
                     if max(strcmp(type.method,valid)) == 0
-                            error('invalid type.method parameter')
+                            error('Invalid type.method parameter')
                     end
                 case 0
                     valid = {'sum','random'};
                     if max(strcmp(type.method,valid)) == 0
-                            error('invalid type.method parameter')
+                            error('Invalid type.method parameter')
                     end
                 otherwise
-                    error('invalid type.col value: must be 0 or 1')
+                    error('Invalid type.col value: must be 0 or 1')
             end
     end
 end
@@ -219,17 +241,16 @@ else
 end
 mvecs(1) = 1; mvecs(2) = mvecs(1);
 nr = norm(r);           % norm of initial residual
-rhs(1) = nr;            % initialize rhs
-if rhs(1)<tol
-    % check for x0 = x
-    fprintf('MPGMRES converged! \n')
+if nr <= tol(2) % check for convergence in absolute residual norm
+    fprintf('MPGMRES converged immediately due to absolute tolerance! \n')
     x = x0;
-    relres = rhs(1);
-    resvec(1) = rhs(1);
+    relres = 1;
+    resvec(1) = 1;
     iter = 0;
     return
 end
 
+rhs(1) = nr;            % initialize rhs
 resvec(1) = 1;          % initialize the vector which stores the residuals
 V(:,1) = r/nr;          % initialize the V matrix with normalized init. resid.
 Z_temp = fullmultiprecondition(P,V(:,1));    % send to multiprecondition to get Z_temp
@@ -280,7 +301,7 @@ for p = 1:nmaxits                 % loop over the columns of Zk
     rhs(pp) = conj(c(pp))*rhs(pp);
     
     %    test_lindep_block;
-    if (lindep_flag==1)&&((abs(rhs(pp+1)) >= max(tol*nr,SMALL))|| ...
+    if (lindep_flag==1)&&((abs(rhs(pp+1)) >= max(tol(1)*nr,SMALL))|| ...
                           (isnan(abs(rhs(pp+1)))))&&(nVk>1) % the last column of Z is dependent on the others
         fprintf('Column of Z linearly dependent...removing \n')
         pp = pp-1;          % reduce index by 1
@@ -324,14 +345,14 @@ for p = 1:nmaxits                 % loop over the columns of Zk
         
         
         %% test convergence
-        if resvec(z_it(1)+1)<tol
+        if resvec(z_it(1)+1)<max(tol(1),tol(2)/nr)
             fprintf('MPGMRES converged! \n')
             z_it(1) = z_it(1) + 1;
             break
         end
         %% multiprecondition
         if nVk == 0
-            error('All current search directions are linearly dependent on the previous ones.\n Re-reun with a different trucation rule or starting vector.')
+            error('All current search directions are linearly dependent on the previous ones.\n Re-reun with a different truncation rule or starting vector.')
         end
         if isa(type,'char') % if just a string, then just a vanilla full or trunc mpgmres
             switch type
