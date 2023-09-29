@@ -15,7 +15,7 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %
 %   X = MPGMRES(A,B,P,TYPE) specifies the type of mpgmres algorithm used.
 %   TYPE can be a string, in which case the accepted values are:
-%    - 'full',which runs full MPGMRES, or 
+%    - 'full', which runs full MPGMRES, or 
 %    - 'trunc', which runs a truncated version.
 %   TYPE can also be a structure, which gives more control over the type of
 %   truncation.  For details, see <a href="matlab: help mpgmres_120112>extended_help">here</a>.  
@@ -26,31 +26,31 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %   The default relative tolerance is 1e-6 while the default absolute
 %   tolerance is 0.
 %
-%   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS) specifies the maxiumum number of
-%   iterations the methods allows.  The default value is n.
+%   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS) specifies the maximum number of
+%   iterations the method allows.  The default value is n.
 %
 %   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS,X0) specifies the initial guess.  X0
 %   must be a vector of dimension n.  The default value is the zero vector.
 %
 %   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS,X0,STOREZ) specifies whether to store
-%   or calculate the matrix of search directions. The storage option
+%   or calculate the matrix of search directions.  The storage option
 %   requires roughly double the storage but must be used if a flexible
-%   method is required. On the other hand, without storage a final
+%   method is required.  On the other hand, without storage a final
 %   multiprecondition step is required to calculate X.  STOREZ = 1 stores,
 %   STOREZ = 0 calculates.  The default is 0.
 %
 %   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS,X0,STOREZ,TESTORTH) specifies whether
 %   or not to check for loss of orthogonality (should only be used for
-%   diagonostic purposes, as this is a relatively expensive process).
+%   diagnostic purposes, as this is a relatively expensive process).
 %   TESTORTH = 1 runs the check, TESTORTH = 0 does not.  The default is 0.
 %
 %   X = MPGMRES(A,B,P,TYPE,TOL,MAXITS,X0,STOREZ,TESTORTH,SAVEMATS)
 %   specifies whether or not to save the matrices generated in the Arnoldi
-%   process at each iteration.  This should only be used for diagonostic
+%   process at each iteration.  This should only be used for diagnostic
 %   purposes, as it is a relatively expensive process.  SAVEMATS = 0
 %   doesn't save matrices, SAVEMATS = 1 does.  The default is 0.
 %
-%   [X,RELRES] = MPGMRES(A,B,...) also returns the relative residual.
+%   [X,RELRES] = MPGMRES(A,B,...) also returns the relative residual norm.
 %
 %   [X,RELRES,ITER] = MPGMRES(A,B,...) also returns the number of
 %   iterations needed for convergence.
@@ -60,16 +60,18 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %
 %   [X,RELRES,ITER,RESVEC,MVECS] = MPGMRES(A,B,...) also returns a vector
 %   of the cumulative number of inner products taken at the end of
-%   each iteration 
+%   each iteration.
 %
 %   For more information, see:
 %   Greif, C., Rees, T., Szyld, D. B.,
 %   <a href="http://www.cs.ubc.ca/~tyronere/TR-2011-12.pdf">Multi-preconditioned GMRES</a>
 %   Technical report: UBC CS TR-2011-12, or Temple Math. report 11-12-23
 %   
-%   12 Jan 2012: First release version of MPGMRES
-%   28 Sep 2023: Modified to work in complex arithmetic
-%                Finer tolerance control and bug fixes
+%   28 Sep 2023     Niall Bootland
+%       Modified to work in complex arithmetic
+%       Finer tolerance control and bug fixes
+%   12 Jan 2012     Tyrone Rees
+%       First release version of MPGMRES
 %
 %   Tyrone Rees                        tyronere@cs.ubc.ca
 %   Department of Computer Science 
@@ -120,18 +122,26 @@ else
     elseif ltol+wtol > 3
         error('The tolerance must be a vector with at most two entries')
     end
-    if max(tol) <= 0
-        error('At least one tolerance value should be positive')
+    if min(tol) < 0
+        error('Tolerance values should be non-negative')
+    elseif max(tol) <= 0
+        error('At least one tolerance value should be strictly positive')
     end
 end
 
 if nargin < 6
     maxits = lb;
+    if lb >= 10000
+        warning(['maxits was unspecified and will be set to the ' ...
+            'length of b\n%s'],['For large problem sizes specify ' ...
+            'maxit to avoid allocation of a large amount of memory'])
+    end
 else
     if (isa(maxits,'numeric') ~= 1 || maxits < 1)
         error('The max number of iterations must be a positive integer')
     end
 end
+
 if nargin < 7
     x0 = zeros(lb,1);
 else
@@ -143,6 +153,7 @@ else
         error('The starting vector must be of the same length as b')
     end
 end
+
 numvarargs = length(varargin);
 if numvarargs > 4
     error('Too many inputs')
@@ -155,17 +166,17 @@ SMALL = 10*eps;
 %     http://www.stanford.edu/dept/ICME/docs/seminars/Paige-2009-11-04.pdf
 
 
-%% Get the type and number of preconditoiners
+%% Get the type and number of preconditioners
 if isa(P,'cell')
     k=length(P);  % number of preconditioners
 else % otherwise, just one preconditioner, applies standard right pre-GMRES
     k = 1;  P = {P};
 end
 
-% check that it's a valid type and calculate the number of 'inner' interations for the maxit supplied
+% check that it's a valid type and calculate the number of 'inner' iterations for the maxit supplied
 if isa(type_in,'char') % if just a string, then just a vanilla full or trunc mpgmres
     switch type_in
-        case 'trunc' 
+        case 'trunc'
             nmaxits = maxits*k;
             type.type = 'trunc'; % set defaults
             type.col = 0;
@@ -189,17 +200,19 @@ elseif isa(type_in,'struct') % if a structure, then allow more control
                 case 1
                     valid = {'inorder','reverse','alternate','random'};
                     if max(strcmp(type.method,valid)) == 0
-                            error('Invalid type.method parameter')
+                        error('Invalid type.method parameter')
                     end
                 case 0
                     valid = {'sum','random'};
                     if max(strcmp(type.method,valid)) == 0
-                            error('Invalid type.method parameter')
+                        error('Invalid type.method parameter')
                     end
                 otherwise
                     error('Invalid type.col value: must be 0 or 1')
             end
     end
+else
+    error('Invalid ''type'' option')
 end
 
 %% pre-allocate variables
@@ -217,7 +230,7 @@ else
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % initialize arrays
     end_V = cell(k,1); end_V(:) = {0};      % stores the end of Vk_index
-    % initalize the structure that holds this information:
+    % initialize the structure that holds this information:
     Zinfo = struct('yk_index',zeros(nmaxits,1),'V_index',zeros(nmaxits,1),'end_V',end_V);
     lastV = 0;
 end
@@ -241,7 +254,7 @@ else
 end
 mvecs(1) = 1; mvecs(2) = mvecs(1);
 nr = norm(r);           % norm of initial residual
-if nr <= tol(2) % check for convergence in absolute residual norm
+if nr <= max(tol(2),0) % check for convergence in absolute residual norm
     fprintf('MPGMRES converged immediately due to absolute tolerance! \n')
     x = x0;
     relres = 1;
@@ -280,7 +293,7 @@ for p = 1:nmaxits                 % loop over the columns of Zk
     H(pp+1,pp) = nw;          % calculate norm of vector w
     
     % TEST if w is the zero vector, hence Z_k is linearly dependent
-    if H(pp+1,pp)<SMALL; lindep_flag = 1;  end
+    if H(pp+1,pp) < SMALL; lindep_flag = 1;  end
     for l = 1:pp-1  % update previous rots
         h1 = H(l,pp);
         h2 = H(l+1,pp);
@@ -345,14 +358,14 @@ for p = 1:nmaxits                 % loop over the columns of Zk
         
         
         %% test convergence
-        if resvec(z_it(1)+1)<max(tol(1),tol(2)/nr)
+        if resvec(z_it(1)+1) <= max(tol(1),tol(2)/nr)
             fprintf('MPGMRES converged! \n')
             z_it(1) = z_it(1) + 1;
             break
         end
         %% multiprecondition
         if nVk == 0
-            error('All current search directions are linearly dependent on the previous ones.\n Re-reun with a different truncation rule or starting vector.')
+            error('All current search directions are linearly dependent on the previous ones\n%s','Re-run with a different truncation rule or starting vector')
         end
         if isa(type,'char') % if just a string, then just a vanilla full or trunc mpgmres
             switch type
@@ -415,7 +428,7 @@ for p = 1:nmaxits                 % loop over the columns of Zk
                 end
                 Zk = k; nVk = 0;      % update size of Z_k and current size of V_k
             elseif type.col == 0 % act on all the columns of V
-                if (z_it(1) == 1)&&(~storeZ) % upadate V_index so it's a cell array, not a vector                    
+                if (z_it(1) == 1)&&(~storeZ) % update V_index so it's a cell array, not a vector                    
                     for ii = 1:k
                         Zinfo(ii).V_index = cell(nmaxits,1);
                         Zinfo(ii).V_index(1) = {1};
@@ -443,7 +456,7 @@ for p = 1:nmaxits                 % loop over the columns of Zk
                 error('Please set type.col to be 0 or 1')
             end
         else
-            error('Invalid ''type'' option. \n')
+            error('Invalid ''type'' option')
         end
         z_it(1) = z_it(1)+1;
         mvecs(z_it(1)+1)= mvecs(z_it(1));
@@ -562,7 +575,7 @@ function extended_help
 %EXTENDED_HELP some technical details about the 'type' option
 %   As well as accepting the strings 'full' and 'trunc', MPGMRES also
 %   accepts a structure input.  The structure should have the fields
-%   TYPE.col and TYPE.method  Accepted values in this case are:
+%   TYPE.col and TYPE.method.  Accepted values in this case are:
 %    - TYPE.col = 1; these act on individual columns of the matrix of basis 
 %      vectors, V_k.  Supported values of TYPE.method in this case are:
 %       + TYPE.method = 'inorder'.  Applies P_i to the ith column of V_k +
@@ -576,7 +589,7 @@ function extended_help
 %       values of TYPE.method in this case are:
 %        + TYPE.method = 'sum'.  Applies P_i to the sum of the columns of
 %           V_k
-%        + TYPE.mehtod = 'random'. Applies P_i to a linear combination of
+%        + TYPE.method = 'random'. Applies P_i to a linear combination of
 %           the columns of V_k, with weights uniformly distributed in the
 %           range [0,1]
 %   For more information, see the manuscript 
