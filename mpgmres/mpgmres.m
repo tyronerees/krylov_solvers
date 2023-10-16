@@ -64,8 +64,9 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %
 %   For more information, see:
 %   Greif, C., Rees, T., Szyld, D. B.,
-%   <a href="http://www.cs.ubc.ca/~tyronere/TR-2011-12.pdf">Multi-preconditioned GMRES</a>
-%   Technical report: UBC CS TR-2011-12, or Temple Math. report 11-12-23
+%   <a href="https://link.springer.com/article/10.1007/s40324-016-0088-7">GMRES with multiple preconditioners</a>
+%   Also available as UBC technical report: <a href="https://www.cs.ubc.ca/sites/default/files/tr/2011/TR-2011-12_0.pdf">UBC CS TR-2011-12</a>, 
+%   or Temple Math. report <a href="https://www.math.temple.edu/~szyld/reports/multipre_report.rev3.pdf">11-12-23</a>.
 %   
 %   28 Sep 2023     Niall Bootland
 %       Modified to work in complex arithmetic
@@ -73,7 +74,11 @@ function [x,relres,iter,resvec,mvecs] = mpgmres(A,b,P,type_in,tol,maxits,x0,vara
 %   12 Jan 2012     Tyrone Rees
 %       First release version of MPGMRES
 %
-%   Tyrone Rees                        tyronere@cs.ubc.ca
+%   Tyrone Rees                        tyrone.rees@stfc.ac.uk               
+%   Computational Mathematics Group
+%   STFC Rutherford Appleton Laboratory
+%
+%   initially written while employed by
 %   Department of Computer Science 
 %   University of British Columbia
 
